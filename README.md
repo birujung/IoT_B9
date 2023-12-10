@@ -1,4 +1,4 @@
-![Blue and Pink Data Visualization Basics modern user information brochure (Trifolds)](https://github.com/birujung/IoT_B9/assets/84667476/dc8bb2e3-3ce7-4f5f-9e11-eb7d80b97ca9)# EnerGizmo: ESP32-Powered Smart Energy Tracker
+# EnerGizmo: ESP32-Powered Smart Energy Tracker
 
 ## Overview
 EnerGizmo aims to create an IoT-based Smart Electricity Energy Meter using ESP32 and the newly updated Blynk 2.0 application. The goal is to automate the process of monitoring electricity consumption and create a streamlined experience. ⚡️📊
