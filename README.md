@@ -22,8 +22,4 @@ To begin, follow these steps:
 ## Contributions
 Contributions and improvements to this project are welcome. Feel free to fork this repository, make changes, and create pull requests. 🤝🔧
 
-## License
-This project is licensed under [insert license here]. See the LICENSE file for details. 📜
 
-## Acknowledgments
-Special thanks to [insert names or organizations] for their contributions, support, or inspiration for this project. 🙏✨
