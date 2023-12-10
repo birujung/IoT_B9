@@ -23,6 +23,7 @@ const float currCalibration = 0.07;
 
 char ssid[] = "JKTMATH-2.4G";
 char pass[] = "bintang123";
+uint32_t lastPublish = 0;
 
 const long  gmtOffset_sec = 25200;
 const int   daylightOffset_sec = 0;
@@ -45,7 +46,7 @@ void readEnergyDataFromEEPROM();
 void saveEnergyDataToEEPROM();
 
 const int ledPin = LED_BUILTIN;
-const char* mqtt_server = "mqtt-dashboard.com";
+const char* mqtt_server = "broker.hivemq.com";
 int mqtt_port = 8884;
 const char* mqtt_username = "birujung";
 const char* mqtt_password = "birujung";
@@ -59,6 +60,9 @@ void setup()
 {
  Serial.begin(115200);
  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+
+ mqttClient.setServer(mqtt_server, mqtt_port);
+ mqttClient.setCallback(callback);
 
  //init and get the time
  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
@@ -80,9 +84,6 @@ void setup()
  delay(1000);
 
  pinMode(ledPin, OUTPUT);
-
- mqttClient.setServer(mqtt_server, mqtt_port);
- mqttClient.setCallback(callback);
 }
 
 void loop()
@@ -90,11 +91,28 @@ void loop()
  Blynk.run();
  timer.run();
 
+ xTaskCreatePinnedToCore(
+    mqttTask,           // Function to execute
+    "MQTT_Task",        // Task name
+    8192,               // Stack size
+    NULL,               // Parameters to pass to the function
+    1,                  // Priority (1 is lower than loop())
+    NULL,               // Task handle
+    1             // Run on the second core
+  );
+
  if (!mqttClient.connected() && !isReconnecting) {
   isReconnecting = true;
   reconnect();
  }
  mqttClient.loop();
+
+ if (millis() - lastPublish >= 5000 && mqttClient.connected()) {
+    lastPublish = millis();
+    mqttClient.publish(mqtt_topic, "Using electricity from lamp.");
+    printLocalTime();
+    Serial.println("\tPublished message to MQTT Topic");
+ }
 }
 
 void printLocalTime()
@@ -105,6 +123,22 @@ void printLocalTime()
     return;
   }
   Serial.print(&timeinfo, "%H:%M:%S");
+}
+
+void mqttTask(void *pvParameters) {
+  (void)pvParameters;
+
+  while (true) {
+    // Handle MQTT events
+    if (!mqttClient.connected() && !isReconnecting) {
+      isReconnecting = true;
+      reconnect();
+    }
+    mqttClient.loop();
+    
+    // Sleep for a short duration to allow other tasks to run
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+  }
 }
 
 void sendEnergyDataToBlynk()
@@ -165,18 +199,12 @@ void sendEnergyDataToBlynk()
 
  if (totalCarbonFt > 18) {
   digitalWrite(ledPin, HIGH);
-  bool publishSuccess = mqttClient.publish(mqtt_topic, "ALERT! YOU HAVE CONSUMED TOO MUCH ELECTRICITY");
   printLocalTime();
-  Serial.println("\tPublished 'Alert' to " + String(mqtt_topic));
-  Serial.print("Publish success: ");
-  Serial.println(publishSuccess);
+  Serial.println("\tALERT! YOU HAVE CONSUMED TOO MUCH ELECTRICITY");
  } else {
   digitalWrite(ledPin, LOW);
-  bool publishSuccess = mqttClient.publish(mqtt_topic, "You're fine~");
   printLocalTime();
-  Serial.println("\tPublished 'None' to " + String(mqtt_topic));
-  Serial.print("Publish success: ");
-  Serial.println(publishSuccess);
+  Serial.println("\tYou're still using SAFE amount of electricity");
  }
  xSemaphoreGive(xMutex);
  printLocalTime();
@@ -217,11 +245,11 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 void reconnect() {
  if (!mqttClient.connected()) {
-  Serial.print("[" + millis() + "]");
-   Serial.print(" Attempting MQTT connection...");
+   Serial.println("Attempting MQTT connection...");
    if (mqttClient.connect("ESP32Client - Tunjung")) {
       Serial.println("MQTT Connected!");
       mqttClient.subscribe(mqtt_topic);
+      Serial.println("Subscribed to MQTT Topic");
       isReconnecting = false;
     } else {
       Serial.print("Failed, rc=");
@@ -229,6 +257,5 @@ void reconnect() {
       Serial.println(" Retrying in 5 seconds...");
       delay(5000);
     }
-  Serial.println("---------------------------------");
  }
 }
